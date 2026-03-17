@@ -64,6 +64,11 @@ def main():
         help="Treat input data as already at target timeframe (no resampling)."
     )
     parser.add_argument(
+        "--timestamp-format", type=str, default=None,
+        help="Explicit timestamp format (e.g. '%%Y-%%m-%%d %%H:%%M:%%S'). "
+             "Usually not needed — Unix and ISO are auto-detected."
+    )
+    parser.add_argument(
         "--show-all-phases", action="store_true",
         help="Show detailed phase progression for debugging."
     )
@@ -73,7 +78,7 @@ def main():
     # Load data
     if args.file:
         print(f"Loading data from: {args.file}")
-        df = load_csv(args.file)
+        df = load_csv(args.file, date_format=args.timestamp_format)
     else:
         print("No data file provided. Generating synthetic Nifty data for demo...")
         df = generate_synthetic_data(n_bars=10000, bar_seconds=1)

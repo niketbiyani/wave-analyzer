@@ -40,7 +40,29 @@ def load_csv(filepath: str, timestamp_col: str = "timestamp",
             f"Could not find timestamp column. Available columns: {list(df.columns)}"
         )
 
-    df["timestamp"] = pd.to_datetime(df[ts_col], format=date_format)
+    raw = df[ts_col]
+
+    # Auto-detect Unix timestamps (integer or float seconds/milliseconds)
+    if pd.api.types.is_numeric_dtype(raw):
+        sample = raw.iloc[0]
+        if sample > 1e12:
+            # Milliseconds (13+ digits)
+            df["timestamp"] = pd.to_datetime(raw, unit="ms")
+        elif sample > 1e9:
+            # Seconds (10 digits) — standard Unix epoch
+            df["timestamp"] = pd.to_datetime(raw, unit="s")
+        else:
+            # Might be seconds with a very old date, try anyway
+            df["timestamp"] = pd.to_datetime(raw, unit="s")
+        # Convert to IST (UTC+5:30) since Nifty trades on NSE
+        df["timestamp"] = df["timestamp"].dt.tz_localize("UTC").dt.tz_convert("Asia/Kolkata").dt.tz_localize(None)
+    else:
+        # String timestamps — try ISO 8601 first, then fallback
+        if date_format:
+            df["timestamp"] = pd.to_datetime(raw, format=date_format)
+        else:
+            df["timestamp"] = pd.to_datetime(raw, format="mixed", dayfirst=False)
+
     if ts_col != "timestamp":
         df = df.drop(columns=[ts_col])
 
