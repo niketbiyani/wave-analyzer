@@ -143,22 +143,25 @@ def filter_signals(signals: list[Signal],
 def print_scan_results(results: dict[str, list[Signal]],
                        require_macd: bool = True,
                        require_ema_trend: bool = False):
-    """Print scan results in a readable format."""
+    """Print scan results with colored terminal output."""
+    from display import (
+        print_timeframe_header, print_signal, print_timeframe_footer,
+        print_no_signals, print_total,
+    )
+
     total = 0
     for tf, signals in sorted(results.items()):
         filtered = filter_signals(signals, require_macd, require_ema_trend)
         if not filtered:
             continue
-        print(f"\n{'='*80}")
-        print(f"  Timeframe: {tf} — {len(filtered)} signal(s) "
-              f"({len(signals)} raw, {len(signals) - len(filtered)} filtered out)")
-        print(f"{'='*80}")
-        for sig in filtered:
-            marker = " ** TREND ALIGNED **" if sig.trend_aligned else ""
-            print(f"  {sig.summary()}{marker}")
+        filtered_out = len(signals) - len(filtered)
+        print_timeframe_header(tf, len(filtered), len(signals), filtered_out)
+        for i, sig in enumerate(filtered):
+            print_signal(sig, i)
             total += 1
+        print_timeframe_footer()
 
     if total == 0:
-        print("\nNo signals detected across any timeframe.")
-    else:
-        print(f"\nTotal: {total} confirmed signal(s)")
+        print_no_signals()
+
+    print_total(total)

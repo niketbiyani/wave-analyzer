@@ -32,7 +32,7 @@ import sys
 
 from sample_data import generate_synthetic_data, load_csv
 from scanner import scan_all_timeframes, scan_timeframe, print_scan_results, filter_signals
-from indicators import compute_all_indicators
+from display import print_banner, print_data_summary, print_settings
 from config import (
     RSI_PERIOD, RSI_EMA_PERIOD, MACD_FAST, MACD_SLOW, MACD_SIGNAL,
     EMA_FAST, EMA_SLOW,
@@ -75,19 +75,26 @@ def main():
 
     args = parser.parse_args()
 
+    print_banner()
+
     # Load data
     if args.file:
-        print(f"Loading data from: {args.file}")
+        source = args.file
         df = load_csv(args.file, date_format=args.timestamp_format)
     else:
-        print("No data file provided. Generating synthetic Nifty data for demo...")
+        source = "Synthetic demo data"
         df = generate_synthetic_data(n_bars=10000, bar_seconds=1)
 
-    print(f"Loaded {len(df)} bars")
-    print(f"  Range: {df['close'].min():.2f} - {df['close'].max():.2f}")
-    if "timestamp" in df.columns:
-        print(f"  Period: {df['timestamp'].iloc[0]} to {df['timestamp'].iloc[-1]}")
-    print()
+    period_start = str(df["timestamp"].iloc[0]) if "timestamp" in df.columns else "N/A"
+    period_end = str(df["timestamp"].iloc[-1]) if "timestamp" in df.columns else "N/A"
+    print_data_summary(
+        bar_count=len(df),
+        price_low=df["close"].min(),
+        price_high=df["close"].max(),
+        period_start=period_start,
+        period_end=period_end,
+        source=source,
+    )
 
     if args.single_tf:
         # Run on data as-is without resampling
@@ -107,15 +114,14 @@ def main():
         print_scan_results(results, require_macd=not args.no_macd_filter,
                            require_ema_trend=args.require_ema_trend)
 
-    # Summary statistics
-    print("\n" + "=" * 80)
-    print("  INDICATOR SETTINGS")
-    print("=" * 80)
-    print(f"  RSI Period: {RSI_PERIOD} | RSI EMA: {RSI_EMA_PERIOD}")
-    print(f"  MACD: {MACD_FAST}/{MACD_SLOW}/{MACD_SIGNAL}")
-    print(f"  Price EMA: {EMA_FAST}/{EMA_SLOW}")
-    print(f"  MACD filter: {'OFF' if args.no_macd_filter else 'ON'}")
-    print(f"  EMA trend filter: {'ON' if args.require_ema_trend else 'OFF'}")
+    # Settings summary
+    print_settings(
+        rsi_period=RSI_PERIOD, rsi_ema=RSI_EMA_PERIOD,
+        macd_fast=MACD_FAST, macd_slow=MACD_SLOW, macd_signal=MACD_SIGNAL,
+        ema_fast=EMA_FAST, ema_slow=EMA_SLOW,
+        macd_filter_on=not args.no_macd_filter,
+        ema_filter_on=args.require_ema_trend,
+    )
 
 
 if __name__ == "__main__":
