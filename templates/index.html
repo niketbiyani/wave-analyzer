@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nifty Wave Analyzer</title>
+    <script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
+    <style>
+        :root {
+            --bg-primary: #0a0e17;
+            --bg-secondary: #111827;
+            --bg-card: #1a2332;
+            --bg-hover: #243044;
+            --border: #2a3a4e;
+            --text-primary: #e2e8f0;
+            --text-secondary: #8899aa;
+            --text-dim: #556677;
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --green: #22c55e;
+            --green-dim: #166534;
+            --red: #ef4444;
+            --red-dim: #991b1b;
+            --yellow: #eab308;
+            --cyan: #06b6d4;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', 'Segoe UI', system-ui, sans-serif;
+            overflow-x: hidden;
+        }
+
+        /* Header */
+        .header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-primary);
+            letter-spacing: -0.5px;
+        }
+
+        .logo span { color: var(--cyan); }
+
+        .header-badge {
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: var(--bg-card);
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Controls bar */
+        .controls {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 8px 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 6px 14px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: var(--bg-card);
+            color: var(--text-primary);
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.15s;
+            font-family: inherit;
+        }
+
+        .btn:hover { background: var(--bg-hover); border-color: var(--accent); }
+        .btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+        .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+        .btn.primary:hover { background: var(--accent-hover); }
+
+        .btn-group {
+            display: flex;
+            gap: 0;
+        }
+
+        .btn-group .btn {
+            border-radius: 0;
+            border-right-width: 0;
+        }
+
+        .btn-group .btn:first-child { border-radius: 6px 0 0 6px; }
+        .btn-group .btn:last-child { border-radius: 0 6px 6px 0; border-right-width: 1px; }
+
+        .divider {
+            width: 1px;
+            height: 24px;
+            background: var(--border);
+        }
+
+        .toggle-wrap {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .toggle {
+            width: 32px;
+            height: 18px;
+            border-radius: 9px;
+            background: var(--bg-hover);
+            border: 1px solid var(--border);
+            cursor: pointer;
+            position: relative;
+            transition: all 0.2s;
+        }
+
+        .toggle.on { background: var(--accent); border-color: var(--accent); }
+
+        .toggle::after {
+            content: "";
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #fff;
+            transition: transform 0.2s;
+        }
+
+        .toggle.on::after { transform: translateX(14px); }
+
+        .upload-area {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .file-input { display: none; }
+
+        .file-name {
+            font-size: 12px;
+            color: var(--text-dim);
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* Data summary strip */
+        .data-strip {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 6px 24px;
+            display: flex;
+            gap: 24px;
+            font-size: 12px;
+        }
+
+        .data-strip .stat {
+            display: flex;
+            gap: 4px;
+        }
+
+        .data-strip .label { color: var(--text-dim); }
+        .data-strip .value { color: var(--text-primary); font-weight: 500; }
+
+        /* Chart area */
+        .chart-wrapper {
+            position: relative;
+        }
+
+        .chart-container {
+            width: 100%;
+            height: 420px;
+            background: var(--bg-primary);
+        }
+
+        .sub-chart-container {
+            width: 100%;
+            height: 160px;
+            background: var(--bg-primary);
+            border-top: 1px solid var(--border);
+        }
+
+        .chart-label {
+            position: absolute;
+            top: 8px;
+            left: 12px;
+            font-size: 11px;
+            color: var(--text-dim);
+            z-index: 5;
+            background: rgba(10, 14, 23, 0.8);
+            padding: 2px 6px;
+            border-radius: 3px;
+            pointer-events: none;
+        }
+
+        /* Signals panel */
+        .signals-panel {
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border);
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .signals-header {
+            padding: 10px 24px;
+            font-size: 13px;
+            font-weight: 600;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            background: var(--bg-secondary);
+            z-index: 2;
+        }
+
+        .signal-count {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+
+        .signal-count.has-signals { background: var(--accent); color: #fff; }
+        .signal-count.empty { background: var(--bg-card); color: var(--text-dim); }
+
+        .signals-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .signals-table th {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-dim);
+            font-weight: 500;
+            text-align: left;
+            padding: 6px 12px;
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 38px;
+            background: var(--bg-secondary);
+        }
+
+        .signals-table td {
+            font-size: 13px;
+            padding: 8px 12px;
+            border-bottom: 1px solid rgba(42, 58, 78, 0.4);
+        }
+
+        .signals-table tr:hover td { background: var(--bg-card); }
+
+        .signals-table tr { cursor: pointer; }
+
+        .dir-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .dir-badge.short { background: var(--red-dim); color: var(--red); }
+        .dir-badge.long { background: var(--green-dim); color: var(--green); }
+
+        .trend-badge {
+            font-size: 10px;
+            padding: 1px 6px;
+            border-radius: 3px;
+        }
+
+        .trend-badge.aligned { background: var(--green-dim); color: var(--green); }
+        .trend-badge.counter { background: rgba(234, 179, 8, 0.15); color: var(--yellow); }
+
+        .rsi-val.ob { color: var(--red); }
+        .rsi-val.os { color: var(--green); }
+        .rsi-val.mid { color: var(--yellow); }
+
+        .macd-val.pos { color: var(--green); }
+        .macd-val.neg { color: var(--red); }
+
+        /* Loading overlay */
+        .loading {
+            position: fixed;
+            inset: 0;
+            background: rgba(10, 14, 23, 0.85);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+
+        .loading.hidden { display: none; }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border);
+            border-top-color: var(--cyan);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Empty state */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 80px 24px;
+            color: var(--text-dim);
+            gap: 16px;
+        }
+
+        .empty-state .icon { font-size: 48px; opacity: 0.3; }
+        .empty-state .msg { font-size: 15px; }
+        .empty-state .sub { font-size: 12px; color: var(--text-dim); }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-primary); }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="header-left">
+            <div class="logo"><span>NIFTY</span> Wave Analyzer</div>
+            <div class="header-badge">RSI Continuation</div>
+        </div>
+        <div class="upload-area">
+            <input type="file" id="csvFile" class="file-input" accept=".csv">
+            <button class="btn" onclick="document.getElementById('csvFile').click()">Upload CSV</button>
+            <span class="file-name" id="fileName"></span>
+            <button class="btn primary" onclick="loadDemo()">Demo Data</button>
+        </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+        <div class="btn-group" id="tfButtons"></div>
+        <div class="divider"></div>
+        <div class="toggle-wrap">
+            MACD Filter
+            <div class="toggle on" id="macdToggle" onclick="toggleFilter(this, 'macd')"></div>
+        </div>
+        <div class="toggle-wrap">
+            EMA Trend
+            <div class="toggle" id="emaToggle" onclick="toggleFilter(this, 'ema')"></div>
+        </div>
+    </div>
+
+    <!-- Data strip -->
+    <div class="data-strip" id="dataStrip">
+        <div class="stat"><span class="label">Source:</span> <span class="value" id="dsSource">—</span></div>
+        <div class="stat"><span class="label">Bars:</span> <span class="value" id="dsBars">—</span></div>
+        <div class="stat"><span class="label">Low:</span> <span class="value" id="dsLow">—</span></div>
+        <div class="stat"><span class="label">High:</span> <span class="value" id="dsHigh">—</span></div>
+    </div>
+
+    <!-- Charts -->
+    <div class="chart-wrapper">
+        <div class="chart-label">PRICE / EMA 50 / EMA 100</div>
+        <div id="priceChart" class="chart-container"></div>
+    </div>
+    <div class="chart-wrapper" style="position:relative;">
+        <div class="chart-label">RSI (14) / RSI EMA (50)</div>
+        <div id="rsiChart" class="sub-chart-container"></div>
+    </div>
+    <div class="chart-wrapper" style="position:relative;">
+        <div class="chart-label">MACD (12/26/9)</div>
+        <div id="macdChart" class="sub-chart-container"></div>
+    </div>
+
+    <!-- Signals table -->
+    <div class="signals-panel" id="signalsPanel">
+        <div class="signals-header">
+            <span>Signals</span>
+            <span class="signal-count empty" id="signalCount">0</span>
+        </div>
+        <table class="signals-table">
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Direction</th>
+                    <th>Entry</th>
+                    <th>Swing</th>
+                    <th>RSI</th>
+                    <th>MACD</th>
+                    <th>EMA 50</th>
+                    <th>EMA 100</th>
+                    <th>Trend</th>
+                </tr>
+            </thead>
+            <tbody id="signalRows"></tbody>
+        </table>
+    </div>
+
+    <!-- Loading -->
+    <div class="loading hidden" id="loading">
+        <div class="spinner"></div>
+    </div>
+
+    <script>
+        // State
+        let state = {
+            data: null,
+            currentTf: null,
+            requireMacd: true,
+            requireEma: false,
+            charts: {},
+        };
+
+        // Charts
+        let priceChart, rsiChart, macdChart;
+        let candleSeries, ema50Series, ema100Series, signalMarkers = [];
+        let rsiSeries, rsiEmaSeries, rsiObLine, rsiOsLine, rsiMidLine;
+        let macdLineSeries, macdSignalSeries, macdHistSeries;
+
+        function initCharts() {
+            const commonOpts = {
+                layout: {
+                    background: { color: '#0a0e17' },
+                    textColor: '#556677',
+                    fontSize: 11,
+                },
+                grid: {
+                    vertLines: { color: 'rgba(42, 58, 78, 0.3)' },
+                    horzLines: { color: 'rgba(42, 58, 78, 0.3)' },
+                },
+                crosshair: {
+                    mode: LightweightCharts.CrosshairMode.Normal,
+                    vertLine: { color: 'rgba(59, 130, 246, 0.3)', width: 1 },
+                    horzLine: { color: 'rgba(59, 130, 246, 0.3)', width: 1 },
+                },
+                rightPriceScale: {
+                    borderColor: '#2a3a4e',
+                    scaleMargins: { top: 0.05, bottom: 0.05 },
+                },
+                timeScale: {
+                    borderColor: '#2a3a4e',
+                    timeVisible: true,
+                    secondsVisible: true,
+                },
+                handleScroll: { vertTouchDrag: false },
+            };
+
+            // Price chart
+            priceChart = LightweightCharts.createChart(
+                document.getElementById('priceChart'),
+                { ...commonOpts, height: 420 }
+            );
+
+            candleSeries = priceChart.addCandlestickSeries({
+                upColor: '#22c55e',
+                downColor: '#ef4444',
+                borderUpColor: '#22c55e',
+                borderDownColor: '#ef4444',
+                wickUpColor: '#22c55e',
+                wickDownColor: '#ef4444',
+            });
+
+            ema50Series = priceChart.addLineSeries({
+                color: '#3b82f6',
+                lineWidth: 1,
+                title: 'EMA 50',
+            });
+
+            ema100Series = priceChart.addLineSeries({
+                color: '#a855f7',
+                lineWidth: 1,
+                title: 'EMA 100',
+            });
+
+            // RSI chart
+            rsiChart = LightweightCharts.createChart(
+                document.getElementById('rsiChart'),
+                { ...commonOpts, height: 160 }
+            );
+
+            rsiSeries = rsiChart.addLineSeries({
+                color: '#a855f7',
+                lineWidth: 1.5,
+                title: 'RSI',
+            });
+
+            rsiEmaSeries = rsiChart.addLineSeries({
+                color: '#eab308',
+                lineWidth: 1,
+                lineStyle: 2,
+                title: 'RSI EMA',
+            });
+
+            // MACD chart
+            macdChart = LightweightCharts.createChart(
+                document.getElementById('macdChart'),
+                { ...commonOpts, height: 160 }
+            );
+
+            macdLineSeries = macdChart.addLineSeries({
+                color: '#3b82f6',
+                lineWidth: 1.5,
+                title: 'MACD',
+            });
+
+            macdSignalSeries = macdChart.addLineSeries({
+                color: '#ef4444',
+                lineWidth: 1,
+                title: 'Signal',
+            });
+
+            macdHistSeries = macdChart.addHistogramSeries({
+                title: 'Histogram',
+            });
+
+            // Sync crosshair across charts
+            syncCharts(priceChart, [rsiChart, macdChart]);
+            syncCharts(rsiChart, [priceChart, macdChart]);
+            syncCharts(macdChart, [priceChart, rsiChart]);
+
+            // Sync visible range
+            priceChart.timeScale().subscribeVisibleLogicalRangeChange(range => {
+                if (range) {
+                    rsiChart.timeScale().setVisibleLogicalRange(range);
+                    macdChart.timeScale().setVisibleLogicalRange(range);
+                }
+            });
+
+            rsiChart.timeScale().subscribeVisibleLogicalRangeChange(range => {
+                if (range) {
+                    priceChart.timeScale().setVisibleLogicalRange(range);
+                    macdChart.timeScale().setVisibleLogicalRange(range);
+                }
+            });
+
+            macdChart.timeScale().subscribeVisibleLogicalRangeChange(range => {
+                if (range) {
+                    priceChart.timeScale().setVisibleLogicalRange(range);
+                    rsiChart.timeScale().setVisibleLogicalRange(range);
+                }
+            });
+
+            // Resize
+            window.addEventListener('resize', () => {
+                const w = document.getElementById('priceChart').clientWidth;
+                priceChart.resize(w, 420);
+                rsiChart.resize(w, 160);
+                macdChart.resize(w, 160);
+            });
+        }
+
+        function syncCharts(source, targets) {
+            source.subscribeCrosshairMove(param => {
+                if (!param || !param.time) return;
+                targets.forEach(t => {
+                    t.setCrosshairPosition(undefined, undefined, t.timeScale());
+                });
+            });
+        }
+
+        function parseTime(isoStr) {
+            // Convert ISO string to Unix timestamp (seconds)
+            const d = new Date(isoStr);
+            return Math.floor(d.getTime() / 1000);
+        }
+
+        function updateCharts(chartData, signals) {
+            if (!chartData || chartData.length === 0) return;
+
+            const candles = [];
+            const ema50Data = [];
+            const ema100Data = [];
+            const rsiData = [];
+            const rsiEmaData = [];
+            const macdData = [];
+            const macdSigData = [];
+            const macdHistData = [];
+
+            chartData.forEach(d => {
+                const t = parseTime(d.time);
+
+                if (d.open != null) {
+                    candles.push({ time: t, open: d.open, high: d.high, low: d.low, close: d.close });
+                }
+                if (d.ema_fast != null) ema50Data.push({ time: t, value: d.ema_fast });
+                if (d.ema_slow != null) ema100Data.push({ time: t, value: d.ema_slow });
+                if (d.rsi != null) rsiData.push({ time: t, value: d.rsi });
+                if (d.rsi_ema != null) rsiEmaData.push({ time: t, value: d.rsi_ema });
+                if (d.macd != null) macdData.push({ time: t, value: d.macd });
+                if (d.macd_signal != null) macdSigData.push({ time: t, value: d.macd_signal });
+                if (d.macd_hist != null) {
+                    macdHistData.push({
+                        time: t,
+                        value: d.macd_hist,
+                        color: d.macd_hist >= 0 ? 'rgba(34, 197, 94, 0.5)' : 'rgba(239, 68, 68, 0.5)',
+                    });
+                }
+            });
+
+            candleSeries.setData(candles);
+            ema50Series.setData(ema50Data);
+            ema100Series.setData(ema100Data);
+            rsiSeries.setData(rsiData);
+            rsiEmaSeries.setData(rsiEmaData);
+            macdLineSeries.setData(macdData);
+            macdSignalSeries.setData(macdSigData);
+            macdHistSeries.setData(macdHistData);
+
+            // Signal markers on price chart
+            const markers = signals.map(sig => ({
+                time: parseTime(sig.time),
+                position: sig.direction === 'SHORT' ? 'aboveBar' : 'belowBar',
+                color: sig.direction === 'SHORT' ? '#ef4444' : '#22c55e',
+                shape: sig.direction === 'SHORT' ? 'arrowDown' : 'arrowUp',
+                text: sig.direction,
+            }));
+
+            // Sort markers by time (required by lightweight-charts)
+            markers.sort((a, b) => a.time - b.time);
+            candleSeries.setMarkers(markers);
+
+            priceChart.timeScale().fitContent();
+            rsiChart.timeScale().fitContent();
+            macdChart.timeScale().fitContent();
+        }
+
+        function updateSignalsTable(signals) {
+            const tbody = document.getElementById('signalRows');
+            const countEl = document.getElementById('signalCount');
+
+            countEl.textContent = signals.length;
+            countEl.className = signals.length > 0 ? 'signal-count has-signals' : 'signal-count empty';
+
+            if (signals.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text-dim);padding:24px;">No signals for this timeframe</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = signals.map(sig => {
+                const time = sig.time ? new Date(sig.time).toLocaleTimeString() : `bar ${sig.bar_index}`;
+                const dirClass = sig.direction === 'SHORT' ? 'short' : 'long';
+                const rsiClass = sig.rsi >= 70 ? 'ob' : sig.rsi <= 30 ? 'os' : 'mid';
+                const macdClass = sig.macd >= 0 ? 'pos' : 'neg';
+                const trendClass = sig.trend_aligned ? 'aligned' : 'counter';
+                const trendText = sig.trend_aligned ? 'ALIGNED' : 'COUNTER';
+
+                return `<tr onclick="scrollToSignal('${sig.time}')">
+                    <td>${time}</td>
+                    <td><span class="dir-badge ${dirClass}">${sig.direction}</span></td>
+                    <td>${sig.entry_price.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+                    <td>${sig.swing_price.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+                    <td><span class="rsi-val ${rsiClass}">${sig.rsi.toFixed(1)}</span></td>
+                    <td><span class="macd-val ${macdClass}">${sig.macd.toFixed(2)}</span></td>
+                    <td>${sig.ema_fast.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+                    <td>${sig.ema_slow.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+                    <td><span class="trend-badge ${trendClass}">${trendText}</span></td>
+                </tr>`;
+            }).join('');
+        }
+
+        function scrollToSignal(isoTime) {
+            if (!isoTime) return;
+            const t = parseTime(isoTime);
+            // Center on the signal with some padding
+            const range = priceChart.timeScale().getVisibleLogicalRange();
+            if (range) {
+                const width = range.to - range.from;
+                priceChart.timeScale().setVisibleRange({
+                    from: t - 120,
+                    to: t + 120,
+                });
+                rsiChart.timeScale().setVisibleRange({
+                    from: t - 120,
+                    to: t + 120,
+                });
+                macdChart.timeScale().setVisibleRange({
+                    from: t - 120,
+                    to: t + 120,
+                });
+            }
+        }
+
+        function updateDataStrip(data) {
+            document.getElementById('dsSource').textContent = data.source || '—';
+            document.getElementById('dsBars').textContent = data.total_bars?.toLocaleString() || '—';
+            document.getElementById('dsLow').textContent = data.price_low?.toLocaleString('en-IN', {minimumFractionDigits: 2}) || '—';
+            document.getElementById('dsHigh').textContent = data.price_high?.toLocaleString('en-IN', {minimumFractionDigits: 2}) || '—';
+        }
+
+        function buildTimeframeButtons(timeframes) {
+            const container = document.getElementById('tfButtons');
+            container.innerHTML = timeframes.map(tf =>
+                `<button class="btn ${tf === state.currentTf ? 'active' : ''}"
+                         onclick="selectTimeframe('${tf}')">${tf.toUpperCase()}</button>`
+            ).join('');
+        }
+
+        function selectTimeframe(tf) {
+            state.currentTf = tf;
+            const tfData = state.data.timeframes[tf];
+            if (!tfData || tfData.error) return;
+
+            buildTimeframeButtons(state.data.available_timeframes);
+
+            const signals = state.requireMacd || state.requireEma
+                ? tfData.signals_filtered
+                : tfData.signals_all;
+
+            updateCharts(tfData.chart_data, signals);
+            updateSignalsTable(signals);
+        }
+
+        function toggleFilter(el, type) {
+            el.classList.toggle('on');
+            if (type === 'macd') state.requireMacd = el.classList.contains('on');
+            if (type === 'ema') state.requireEma = el.classList.contains('on');
+            // Re-fetch with new filters
+            if (state.data) rescan();
+        }
+
+        function showLoading(show) {
+            document.getElementById('loading').classList.toggle('hidden', !show);
+        }
+
+        async function loadDemo() {
+            showLoading(true);
+            try {
+                const res = await fetch('/api/demo');
+                state.data = await res.json();
+                onDataLoaded();
+            } catch (e) {
+                alert('Failed to load demo data: ' + e.message);
+            }
+            showLoading(false);
+        }
+
+        async function uploadFile(file) {
+            showLoading(true);
+            const form = new FormData();
+            form.append('file', file);
+
+            try {
+                const res = await fetch('/api/upload', { method: 'POST', body: form });
+                if (!res.ok) {
+                    const err = await res.json();
+                    alert('Upload failed: ' + (err.error || 'Unknown error'));
+                    showLoading(false);
+                    return;
+                }
+                state.data = await res.json();
+                document.getElementById('fileName').textContent = file.name;
+                onDataLoaded();
+            } catch (e) {
+                alert('Upload failed: ' + e.message);
+            }
+            showLoading(false);
+        }
+
+        async function rescan() {
+            if (!state.currentTf) return;
+            showLoading(true);
+            try {
+                const res = await fetch('/api/scan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        timeframe: state.currentTf,
+                        require_macd: state.requireMacd,
+                        require_ema_trend: state.requireEma,
+                    }),
+                });
+                state.data = await res.json();
+                onDataLoaded(false);
+            } catch (e) {
+                console.error(e);
+            }
+            showLoading(false);
+        }
+
+        function onDataLoaded(resetTf = true) {
+            updateDataStrip(state.data);
+            const tfs = state.data.available_timeframes || [];
+
+            if (resetTf || !state.currentTf || !tfs.includes(state.currentTf)) {
+                // Pick the best default timeframe
+                state.currentTf = tfs.includes('1m') ? '1m' : tfs[0];
+            }
+
+            buildTimeframeButtons(tfs);
+            selectTimeframe(state.currentTf);
+        }
+
+        // Init
+        document.addEventListener('DOMContentLoaded', () => {
+            initCharts();
+
+            document.getElementById('csvFile').addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    uploadFile(e.target.files[0]);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
